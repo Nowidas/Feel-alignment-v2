@@ -33,3 +33,9 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+*.apk
+
+# Keys
+service-account-backend.json
+keys.json

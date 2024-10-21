@@ -1,4 +1,4 @@
-import config from './config.json';
+import config from "./config.json";
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -11,6 +11,7 @@ import {
   Alert,
   Dimensions,
   ScrollView,
+  Switch,
 } from "react-native";
 import Slider from "@react-native-community/slider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -33,12 +34,13 @@ export default function App() {
     false,
     false,
   ]);
-  const [sliderValue, setSliderValue] = useState(5);
+  const [sliderValue, setSliderValue] = useState(null);
   const [inputText, setInputText] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [usernameError, setUsernameError] = useState("");
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(true);
+  const [isForToday, setIsForToday] = useState(true); // true: today, false: yesterday
 
   useEffect(() => {
     const loadUsernameAndQuote = async () => {
@@ -46,6 +48,7 @@ export default function App() {
       const storedQuote = await AsyncStorage.getItem("quote");
       const storedDate = await AsyncStorage.getItem("quoteDate");
       const currentDate = new Date().toISOString().split("T")[0];
+      const storedInputText = await AsyncStorage.getItem("inputText");
 
       if (storedUsername) {
         setUsername(storedUsername);
@@ -57,6 +60,10 @@ export default function App() {
         setQuote(storedQuote);
       } else {
         fetchNewQuote();
+      }
+
+      if (storedInputText) {
+        setInputText(storedInputText);
       }
     };
     loadUsernameAndQuote();
@@ -104,6 +111,18 @@ export default function App() {
         repeats: true, // Repeat every day
       },
     });
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Reminder",
+        body: "I'm not asking 🔫",
+        sound: "default",
+      },
+      trigger: {
+        hour: 23, // Schedule for 23:59 PM
+        minute: 59,
+        repeats: true, // Repeat every day
+      },
+    });
   };
 
   const fetchNewQuote = async () => {
@@ -118,7 +137,7 @@ export default function App() {
       let updatedQuotes = [];
       console.log("Fetching quotes from API...");
       try {
-        const response = await fetch("http://192.168.100.18:5000/quotes"); // Change later for url from local DNS
+        const response = await fetch("http://192.168.100.18:5000/quotes"); // Change later for url fromlocal DNS
         const apiQuotes = await response.json();
         updatedQuotes = syncLocalStorageWithAPI(localQuotes, apiQuotes);
         await AsyncStorage.setItem("quotes", JSON.stringify(updatedQuotes));
@@ -193,9 +212,7 @@ export default function App() {
     setCheckedItems(newCheckedItems);
   };
 
-  const formatDate = () => {
-    const now = new Date();
-
+  const formatDate = (now) => {
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const day = String(now.getDate()).padStart(2, "0");
@@ -218,12 +235,23 @@ export default function App() {
   };
 
   const handleSubmit = async () => {
+    if (!sliderValue) {
+      alert("Please rate your day before submitting.");
+      return;
+    }
+    const submissionDate = new Date();
+    if (!isForToday) {
+      // If it's for yesterday, adjust the date and time
+      submissionDate.setDate(submissionDate.getDate() - 1);
+      submissionDate.setHours(23, 59, 0, 0); // Set time to 23:59
+    }
+
     const data = {
       nick: username,
       ...transformCheckedItems(checkedItems),
       mood: sliderValue,
       activities: inputText,
-      date: formatDate(),
+      date: formatDate(submissionDate),
     };
 
     try {
@@ -249,13 +277,24 @@ export default function App() {
       setCheckedItems([false, false, false, false]);
       setSliderValue(5);
       setInputText("");
-      await AsyncStorage.setItem("lastSubmitTime", new Date().toISOString());
-      setTimeout(() => setIsSubmitEnabled(true), 12 * 60 * 60 * 1000); // 12 hours
+      await AsyncStorage.setItem("inputText", "");
+      if (isForToday) {
+        await AsyncStorage.setItem("lastSubmitTime", new Date().toISOString());
+        setTimeout(() => setIsSubmitEnabled(true), 12 * 60 * 60 * 1000); // 12 hours
+      } else {
+        setIsForToday(true); // Reset to today after submitting for yesterday
+        setIsSubmitEnabled(true);
+      }
     } catch (error) {
       console.error("Failed to submit data:", error);
       alert("Failed to submit data.");
       setIsSubmitEnabled(true);
     }
+  };
+
+  const handleTextChange = (text) => {
+    setInputText(text);
+    AsyncStorage.setItem("inputText", text); // Save it to AsyncStorage
   };
 
   const copyToClipboard = () => {
@@ -320,10 +359,34 @@ export default function App() {
         placeholder="What did you do today?"
         placeholderTextColor="#777"
         value={inputText}
-        onChangeText={setInputText}
+        onChangeText={handleTextChange}
         multiline
       />
+      <View style={styles.switchContainer}>
+        <TouchableOpacity
+          style={[
+            styles.switchButton,
+            isForToday ? styles.activeSwitch : styles.inactiveSwitch,
+          ]}
+          onPress={() => setIsForToday(true)}
+        >
+          <Text style={isForToday ? styles.activeText : styles.inactiveText}>
+            Today
+          </Text>
+        </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[
+            styles.switchButton,
+            !isForToday ? styles.activeSwitch : styles.inactiveSwitch,
+          ]}
+          onPress={() => setIsForToday(false)}
+        >
+          <Text style={!isForToday ? styles.activeText : styles.inactiveText}>
+            Yesterday
+          </Text>
+        </TouchableOpacity>
+      </View>
       <TouchableOpacity
         style={[styles.submitButton, { opacity: isSubmitEnabled ? 1 : 0.5 }]}
         onPress={isSubmitEnabled ? handleSubmit : null}
@@ -507,5 +570,31 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
+  },
+  switchContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  switchButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 8,
+    marginHorizontal: 5,
+  },
+  activeSwitch: {
+    backgroundColor: "#BB86FC", // Active color for selected option
+  },
+  inactiveSwitch: {
+    backgroundColor: "#f4f3f4", // Inactive color for unselected option
+  },
+  activeText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  inactiveText: {
+    color: "#767577",
   },
 });
