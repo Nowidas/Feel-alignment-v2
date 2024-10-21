@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Feel-alignment-v2",
+    "slug": "Feel-alignment-v2",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/appIco.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "",
+      "resizeMode": "contain",
+      "backgroundColor": "#1c1c1c"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/appIco.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.nowidas.Feelalignmentv2"
+    },
+    "web": {
+      "favicon": "./assets/appIco.png"
+    },
+    "plugins": [
+      "expo-build-properties",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b7c42b3e-2c09-4f79-8635-590abb247346"
+      }
+    }
+  }
+}
